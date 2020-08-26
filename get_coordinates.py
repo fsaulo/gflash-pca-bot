@@ -1,7 +1,7 @@
 import cv2
 
 reftPt = []
-panel_img = cv2.imread('GF_table.png', cv2.IMREAD_GRAYSCALE)
+panel_img = cv2.imread('GF_stage_3.png', cv2.IMREAD_GRAYSCALE)
 
 def click(event, x, y, flags, param):
     global reftPt
