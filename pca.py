@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import time
 import cv2
 
 STAGE = 'gf_stage.png'
@@ -11,7 +12,7 @@ NOTE4 = 'gf_note_yellow.png'
 def PCA(M, k=2):
     x1, x2 = M.shape
     if (x1 >= x2): M = M.T
-    R = np.cov(M)
+    R = np.cov(M - mean(M))
     lamb, Vy = np.linalg.eigh(R)
     return lamb, M.T.dot(Vy)[:,:k]
 
@@ -29,7 +30,7 @@ def linfit(set):
 def euclidian_dist(V, Vt=None):
     return np.linalg.norm(V - Vt)
 
-def set_plt_params(figsize=[10,4], figdpi=150, style='default'):
+def set_plt_params(figsize=[8,5], figdpi=150, style='default'):
     plt.rcParams['figure.figsize'] = figsize
     plt.rcParams['figure.dpi'] = figdpi
     plt.style.use(style)
@@ -59,7 +60,7 @@ def cut_img(U, pos, size=(60,80)):
 
 if __name__ == '__main__':
 
-    set_plt_params(style='seaborn-darkgrid')
+    set_plt_params(style='dark_background', figdpi=200)
 
     w, h = (60, 80)
     img = cv2.imread(STAGE, cv2.IMREAD_GRAYSCALE)
@@ -70,9 +71,8 @@ if __name__ == '__main__':
         imgc = cv2.imread(note, cv2.IMREAD_GRAYSCALE)
         A[index:w*h] = imgc.reshape(w*h)
 
-    lamb, V = PCA(A.T, k=4)
-
-    U = normalize(mean(V.T * A))
+    lamb, V = PCA(A.T, k=2)
+    U = mean(V.T)
 
     W, H = (840, 560)
     img_pad = np.zeros((W, H))
@@ -82,32 +82,48 @@ if __name__ == '__main__':
 
     print(img_pad.shape)
 
-    for j in range(0, 7):
-        for i in range(0, 14):
-            im = img_pad[w*i:w*(i+1),j*h:h*(j+1)]
-            L = normalize(mean(V.T * im.reshape(w*h)))
+    plt.ion()
+
+    fig, axs = plt.subplots()
+    im1 = axs.imshow(img)
+
+    stepx, stepy = (10, 30)
+    maxx = int(W/stepx) - 20
+    maxy = int(H/stepy) - 1
+    d = np.zeros(maxx*maxy); k = 0
+
+    for i in range(maxx):
+        for j in range(maxy):
+            dx = (stepx*i, w + (stepx*i))
+            dy = (stepy*j, h + (stepy*j))
+            im = img_pad[dx[0]:dx[1],dy[0]:dy[1]]
+
+            L = mean(U * (im.reshape(w*h) - mean(A)))
             dist = euclidian_dist(U, L)
 
             print('D = {:.2f}'.format(dist))
-            print('index = ({}, {})'.format(i, j))
+            print('Maping = ({}, {})'.format(i, j))
 
-            if dist < 0.35:
+            d[k] = dist; k += 1
+            norm = 1e6
+            threshold = 0.93
+
+            if dist < threshold*norm:
                 count += 1
+                pt = (dy[0], dx[0])
+
                 print('FOUND!')
+                print('Coords (x, y) = ({}, {})'.format(pt[0],pt[1]))
                 print('------')
 
+                cv2.rectangle(img, pt, (pt[0] + h, pt[1] + w), (255,255,255), 3)
+                im1.set_data(img)
+            fig.canvas.flush_events()
+            # time.sleep(0.5)
 
     print('Found {} notes'.format(count))
 
-    # imshow(adjust_to_plot(V, 4, (w, h)))
-
-    # img_rec1 = np.dot(V1, V1.T) * np.matrix(template)
-    # img_rec2 = np.dot(V2, V2.T) * np.matrix(area)
-
-    # print('---------------PCA---------------')
-    # print('Mean = {:.2f}'.format(R.mean()))
-    # print('Diag = {:.2f}'.format(diagonal_mean))
-    # print('Weight = {:.2f}'.format(weight))
-    # print('Max = {:.2f}'.format(np.max(R)))
-
-    plt.show()
+    # pt = (240,480)
+    # cv2.rectangle(img, pt, (pt[0] + h, pt[1] + w), (255,255,255), 3)
+    # cv2.imshow('', img)
+    # cv2.waitKey()
