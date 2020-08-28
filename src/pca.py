@@ -3,11 +3,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2
 
-STAGE = 'gf_stage.png'
-NOTE1 = 'gf_note_blue.png'
-NOTE2 = 'gf_note_red.png'
-NOTE3 = 'gf_note_orange.png'
-NOTE4 = 'gf_note_yellow.png'
+STAGE = '../images/gf_stage.png'
+NOTE1 = '../images/gf_note_blue.png'
+NOTE2 = '../images/gf_note_red.png'
+NOTE3 = '../images/gf_note_orange.png'
+NOTE4 = '../images/gf_note_yellow.png'
 
 def PCA(M, k=2):
     x1, x2 = M.shape
