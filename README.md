@@ -1,5 +1,4 @@
-# gflash-pca-bot
-### Visual computing application using PCA
+## Visual computing application using PCA
 
 ------
 
