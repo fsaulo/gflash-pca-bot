@@ -1,6 +1,7 @@
 import time
 import numpy as np
 import matplotlib.pyplot as plt
+import pyscreenshot as ps
 import cv2
 
 STAGE = '../images/gf_stage.png'
@@ -63,7 +64,7 @@ if __name__ == '__main__':
     set_plt_params(style='dark_background', figdpi=200)
 
     w, h = (60, 80)
-    img = cv2.imread(STAGE, cv2.IMREAD_GRAYSCALE) / 255
+    # img = cv2.imread(STAGE, cv2.IMREAD_GRAYSCALE) / 255
     notes = [NOTE1, NOTE2, NOTE3, NOTE4]
     A = np.zeros([len(notes), w*h])
 
@@ -71,50 +72,80 @@ if __name__ == '__main__':
         imgc = cv2.imread(note, cv2.IMREAD_GRAYSCALE) / 255
         A[index:w*h] = imgc.reshape(w*h)
 
-    lamb, V = PCA(A.T, k=4)
-    U = normalize(mean(V.T.dot(A)))
+    lamb, V = PCA(A.T, k=2)
+    U = mean(V.T.dot(A))
 
-    W, H = (840, 560)
-    img_pad = np.zeros((W, H))
-    img_pad[:img.shape[0],:img.shape[1]] = img
+    W, H = (560, 840)
+    # img_pad = np.zeros((W, H))
+    # img_pad[:img.shape[0],:img.shape[1]] = img
     j = 0; leng = int(W*H/(w*h))
 
-    stepx, stepy = (20, 30)
-    maxx = int(W/stepx) - 10
-    maxy = int(H/stepy) - 1
+    res = (820, 580)
+    x0, y0 = (40, 300)
 
-    d = np.zeros(maxx*maxy); k = 0
-    locations = []
+    t1 = [330,230]
+    t2 = [490,230]
+    t3 = [205,530]
+    t4 = [615,530]
+
+    pts1 = np.float32([t1, t2, t3, t4])
+    pts2 = np.float32([[0,0], [W,0], [0,H], [W,H]])
+
+    stepx, stepy = (15, 20)
+    maxx = int(W/stepx) + 12
+    maxy = int(H/stepy) - 17
 
     start = time.time()
 
-    for i in range(maxx):
-        dx = (stepx*i, w + (stepx*i))
-        for j in range(maxy):
-            dy = (stepy*j, h + (stepy*j))
-            im = img_pad[dx[0]:dx[1], dy[0]:dy[1]]
+    while True:
+        locations = []
+        start = time.time()
+        img = ps.grab(bbox=(x0, y0, res[0] + x0, res[1] + y0), backend="maim")
+        fps = 1/(time.time() - start)
+        d = np.zeros(maxx*maxy); k = 0
+        print('FPS = {:.2f}'.format(fps))
 
-            L = normalize(mean(U * (im.reshape(w*h) - mean(A))))
-            dist = euclidian_dist(U, L)
+        frame = np.array(img)
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) / 255
 
-            d[k] = dist; k += 1
-            threshold = 1.925
+        M = cv2.getPerspectiveTransform(pts1, pts2)
+        img_pad = cv2.warpPerspective(frame, M, (W,H))
 
-            if dist < threshold:
-                locations.append([dy[0], dx[0] - 10, int(w*1.2), int(h)])
-                locations.append([dy[0], dx[0], int(w), int(h)])
+        for i in range(maxx):
+            for j in range(maxy):
+                dx = (stepx*i, w + (stepx*i))
+                dy = (stepy*j, h + (stepy*j))
+                im = img_pad[dx[0]:dx[1], dy[0]:dy[1]]
 
-    rects, _ = cv2.groupRectangles(locations, 1, 0.4)
+                L = mean(U * (im.reshape(w*h) - mean(A)))
+                dist = euclidian_dist(U, L)
 
-    print('Elapsed time for 1 image = {:.2f}s'.format(time.time() - start))
-    print('FPS = {:.1f}'.format(1/(time.time() - start)))
-    print('Found {} points'.format(len(d[d < threshold])))
-    print('Grouped {} rectangles'.format(len(rects)))
+                d[k] = dist; k += 1
+                threshold = 43.68
 
-    for (x, y, w, h) in rects:
-        top_left = (x, y)
-        bottom_right = (x + h, y + w)
-        cv2.rectangle(img, top_left, bottom_right, (255,255,255), 3)
+                if dist < threshold:
+                    locations.append([dy[0], dx[0], int(w*0.7), int(h*0.7)])
+                    locations.append([dy[0], dx[0], int(w*0.7), int(h*0.7)])
 
-    cv2.imshow('', img)
-    cv2.waitKey()
+        rects, _ = cv2.groupRectangles(locations, 1, 0.5)
+
+        for (x, y, w1, h1) in rects:
+            top_left = (x, y)
+            bottom_right = (x + h1, y + w1)
+            cv2.rectangle(img_pad, top_left, bottom_right, (255,255,255), 3)
+
+        if cv2.waitKey(1) == ord("q"):
+            cv2.destroyAllWindows()
+            break
+
+        factor = 0.6
+        dim = (int(W * (factor+0.1)), int(H * factor))
+        out = cv2.resize(img_pad, dim, interpolation = cv2.INTER_AREA)
+
+        title = 'Screen Capture (Guitar Flash 3) {}x{}'.format(dim[0], dim[1])
+        cv2.imshow(title, out)
+
+    # print('Elapsed time for 1 image = {:.2f}s'.format(time.time() - start))
+    # print('FPS = {:.1f}'.format(1/(time.time() - start)))
+    # print('Found {} points'.format(len(d[d < threshold])))
+    # print('Grouped {} rectangles'.format(len(rects)))
