@@ -1,14 +1,12 @@
+import os
+import sys
 import time
+import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import pyscreenshot as ps
-import cv2
-
-STAGE = '../images/gf_stage.png'
-NOTE1 = '../images/gf_note_blue.png'
-NOTE2 = '../images/gf_note_red.png'
-NOTE3 = '../images/gf_note_orange.png'
-NOTE4 = '../images/gf_note_yellow.png'
+import itertools
+from modules import screenshot
 
 def PCA(M, k=2):
     x1, x2 = M.shape
@@ -59,30 +57,50 @@ def mean(M):
 def cut_img(U, pos, size=(60,80)):
     return U[pos[0]:size[0]+pos[0],pos[1]:size[1]+pos[1]]
 
+def pre_processing():
+    frame = np.array(img)
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) / 255
+
+
+def perspective_transform(frame, x1, x2, width, height):
+    M = cv2.getPerspectiveTransform(x1, x2)
+    return cv2.warpPerspective(frame, M, (width, height))
+
+
 if __name__ == '__main__':
 
     set_plt_params(style='dark_background', figdpi=200)
 
-    w, h = (60, 80)
-    # img = cv2.imread(STAGE, cv2.IMREAD_GRAYSCALE) / 255
-    notes = [NOTE1, NOTE2, NOTE3, NOTE4]
-    A = np.zeros([len(notes), w*h])
+    # size of the template
+    w, h = (50, 60);
 
-    for index, note in enumerate(notes):
-        imgc = cv2.imread(note, cv2.IMREAD_GRAYSCALE) / 255
+    print(38*'-' + '\nLoading templates...')
+    templates_path = '../images/classification/'
+
+    files = os.listdir(templates_path)
+    A = np.zeros([len(files), w * h])
+
+    for index, file in enumerate(files):
+        note = os.path.join(templates_path, file)
+        imgc = cv2.imread(note, cv2.IMREAD_GRAYSCALE) / 256
+        imgc = cv2.resize(imgc, (h, w), interpolation = cv2.INTER_AREA)
         A[index:w*h] = imgc.reshape(w*h)
+        print(note + ' loaded!')
 
-    lamb, V = PCA(A.T, k=2)
+    print('{} templates loaded & read for classification'.format(len(A)))
+    print(38*'-' + '\nCalculating a base for templates...')
+
+    lamb, V = PCA(A.T, k=5)
     U = mean(V.T.dot(A))
 
-    W, H = (560, 840)
-    # img_pad = np.zeros((W, H))
-    # img_pad[:img.shape[0],:img.shape[1]] = img
-    j = 0; leng = int(W*H/(w*h))
-
+    # coords of the top left corner
+    # screen resolution of the area to be recorded
+    # width and height of the processed frame
+    x0, y0 = (40, 400)
     res = (820, 580)
-    x0, y0 = (40, 300)
+    W, H = (380, 550)
 
+    # position of the inner stage, where the notes are placed
     t1 = [330,230]
     t2 = [490,230]
     t3 = [205,530]
@@ -91,61 +109,68 @@ if __name__ == '__main__':
     pts1 = np.float32([t1, t2, t3, t4])
     pts2 = np.float32([[0,0], [W,0], [0,H], [W,H]])
 
-    stepx, stepy = (15, 20)
-    maxx = int(W/stepx) + 12
-    maxy = int(H/stepy) - 17
+    # this is the frame search, if stepx, stepy < w, h the exceeding sizes
+    # will overlap the search window making the classification more accurate
+    # in exchange for computing power
+    stepx, stepy = (20, 20)
+    maxx, maxy = (17, 24)
+    threshold = 28.8
+    grouping = 0.56
+    factor = 1
+    pr = 1
+    dim = (int(W * (pr+0.1)), int(H * pr))
 
-    start = time.time()
+    print('Starting classification...')
+    start = time.time(); l = 0; avgt = 0.0
 
     while True:
         locations = []
-        start = time.time()
-        img = ps.grab(bbox=(x0, y0, res[0] + x0, res[1] + y0), backend="maim")
-        fps = 1/(time.time() - start)
         d = np.zeros(maxx*maxy); k = 0
-        print('FPS = {:.2f}'.format(fps))
+        start = time.time(); l += 1
 
+        img = screenshot.grab_screen(x0, y0, res[0] + x0, res[1] + y0)
         frame = np.array(img)
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) / 255
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) / 256
+        img_pad = perspective_transform(frame, pts1, pts2, W, H)
+        img_screenshot = img_pad.copy()
 
-        M = cv2.getPerspectiveTransform(pts1, pts2)
-        img_pad = cv2.warpPerspective(frame, M, (W,H))
-
-        for i in range(maxx):
-            for j in range(maxy):
+        for i in range(maxy):
+            for j in range(maxx):
                 dx = (stepx*i, w + (stepx*i))
                 dy = (stepy*j, h + (stepy*j))
+
                 im = img_pad[dx[0]:dx[1], dy[0]:dy[1]]
 
                 L = mean(U * (im.reshape(w*h) - mean(A)))
                 dist = euclidian_dist(U, L)
-
                 d[k] = dist; k += 1
-                threshold = 43.68
 
                 if dist < threshold:
-                    locations.append([dy[0], dx[0], int(w*0.7), int(h*0.7)])
-                    locations.append([dy[0], dx[0], int(w*0.7), int(h*0.7)])
+                    locations.append([dy[0]+5, dx[0]+5, int(w*0.75), int(h*0.7)])
+                    locations.append([dy[0]+5, dx[0]+5, int(w*0.75), int(h*0.7)])
 
-        rects, _ = cv2.groupRectangles(locations, 1, 0.5)
+            rects, _ = cv2.groupRectangles(locations, factor, grouping)
+            for (x, y, w1, h1) in rects:
+                top_left = (x, y)
+                bottom_right = (x + h1, y + w1)
+                cv2.rectangle(img_pad, top_left, bottom_right, (255,255,255), 2)
 
-        for (x, y, w1, h1) in rects:
-            top_left = (x, y)
-            bottom_right = (x + h1, y + w1)
-            cv2.rectangle(img_pad, top_left, bottom_right, (255,255,255), 3)
+        avgt += (time.time() - start)
+        out = cv2.resize(img_pad, dim, interpolation = cv2.INTER_AREA)
+        key = cv2.waitKey(1)
 
-        if cv2.waitKey(1) == ord("q"):
+        if key == ord('q'):
+            print(38*'-' + '\nFrame time = {:.2f}s; average FPS = {:.2f}'.format(avgt/l, l/(avgt)))
+            print('Dist. = {:.2f}'.format(d.mean()))
+            print('End program.\n'+ 38*'-')
             cv2.destroyAllWindows()
             break
 
-        factor = 0.6
-        dim = (int(W * (factor+0.1)), int(H * factor))
-        out = cv2.resize(img_pad, dim, interpolation = cv2.INTER_AREA)
+        elif key == ord('s'):
+            path = '../images/screenshots/screenshot_{}_stage.png'.format(int(time.time()))
+            output = np.array(img_screenshot * 256, dtype=np.uint8)
+            cv2.imwrite(path, output)
+            print('Screenshot taken saved at ' + path)
 
         title = 'Screen Capture (Guitar Flash 3) {}x{}'.format(dim[0], dim[1])
         cv2.imshow(title, out)
-
-    # print('Elapsed time for 1 image = {:.2f}s'.format(time.time() - start))
-    # print('FPS = {:.1f}'.format(1/(time.time() - start)))
-    # print('Found {} points'.format(len(d[d < threshold])))
-    # print('Grouped {} rectangles'.format(len(rects)))
