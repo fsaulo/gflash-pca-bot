@@ -18,6 +18,12 @@ def grab_screen(x1,y1,x2,y2):
     grab.getScreen(x1,y1, w, h, result)
     return Image.frombuffer('RGB', (w, h), result, 'raw', 'RGB', 0, 1)
 
+def save(img, path=''):
+    path = '/home/felix/Documents/Projects/gflash/images/screenshots/'
+    img.save(path + 'screenshot_{}.png'.format(int(time.time())))
+    print('Screenshot taken saved at ' + path)
+
+
 if __name__ == '__main__':
     start = time.time()
     im = grab_screen(0,0,1440,900)
