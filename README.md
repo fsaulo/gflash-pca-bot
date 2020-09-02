@@ -6,7 +6,7 @@ That kind of analysis is not necessary, perhaps extremely redundant for this app
 
 ## Instructions
 
-The screenshot module does not work with systems other than uses X11 window manager. Support will be added in the future.
+The screenshot module does not work with systems other than those who uses X11 window manager. Support will (probably) be added in the future.
 You can currently change manually to use pyscreenshot module that works in any system in exchange that is a lot slower.
 
 Replace the following line from 'guitarbot.py'
