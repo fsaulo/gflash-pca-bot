@@ -1,12 +1,11 @@
-import os
-import sys
-import time
+import time, os
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
-import pyscreenshot as ps
-import itertools
+from pynput.keyboard import Key, Controller
 from modules import screenshot
+from queue import Queue
+from threading import Thread
 
 def PCA(M, k=2):
     x1, x2 = M.shape
@@ -34,13 +33,12 @@ def set_plt_params(figsize=[5,5], figdpi=150, style='default'):
     plt.rcParams['figure.dpi'] = figdpi
     plt.style.use(style)
 
-def adjust_to_plot(X, i, dim):
-    x1, x2 = X.shape
+def adjust_to_plot(X, i, dim, orientation='horizontal'):
     M = []
-    if x1 == i:
+    if orientation == 'horizontal':
         for j in range(i):
             M.append(X[j:j+1,:].reshape(dim[0], dim[1]))
-    else:
+    elif orientation == 'vertical':
         for j in range(i):
             M.append(X[:,j:j+1].reshape(dim[0], dim[1]))
     return M
@@ -66,13 +64,60 @@ def perspective_transform(frame, x1, x2, width, height):
     M = cv2.getPerspectiveTransform(x1, x2)
     return cv2.warpPerspective(frame, M, (width, height))
 
+def play_note(q):
+    while True:
+        note = q.get()
+        keyboard.press(note)
+        time.sleep(0.012)
+        keyboard.release(note)
+        q.task_done()
+
+def sensor(notes):
+    pressed = False
+
+    for detection in notes:
+        x, y, h, w = detection
+        centroid = (x + int(w/2), y + int(h/2))
+
+        if centroid[1] >= 435 and centroid[1] <= 445:
+            pressed = True
+            print(38*'-' + '\nDETECTED: ({}, {})'.format(centroid[0], centroid[1]))
+            if centroid[0] >= 0 and centroid[0] <= 85:
+                print('GREEN\n' + 38*'-')
+                q1.put('a')
+                return pressed, centroid
+            elif centroid[0] >= 90 and centroid[0] <= 155:
+                print('RED\n' + 38*'-')
+                q1.put('s')
+                return pressed, centroid
+            elif centroid[0] >= 160 and centroid[0] <= 225:
+                print('YELLOW\n' + 38*'-')
+                q1.put('j')
+                return pressed, centroid
+            elif centroid[0] >= 230 and centroid[0] <= 295:
+                print('BLUE\n' + 38*'-')
+                q1.put('k')
+                return pressed, centroid
+            elif centroid[0] >= 300 and centroid[0] <= 370:
+                print('ORANGE\n' + 38*'-')
+                q1.put('l')
+                return pressed, centroid
+
+    return pressed, (0,0)
+
 
 if __name__ == '__main__':
 
-    set_plt_params(style='dark_background', figdpi=200)
+    keyboard = Controller()
+    nq = 1
+    q1 = Queue()
+    worker = Thread(target=play_note, args=(q1,))
+    worker.setDaemon(True)
+    worker.start()
+    q1.join()
 
     # size of the template
-    w, h = (50, 60);
+    w, h = (50, 60)
 
     print(38*'-' + '\nLoading templates...')
     templates_path = '../images/classification/'
@@ -90,13 +135,14 @@ if __name__ == '__main__':
     print('{} templates loaded & read for classification'.format(len(A)))
     print(38*'-' + '\nCalculating a base for templates...')
 
-    lamb, V = PCA(A.T, k=5)
+    lamb, V = PCA(A.T, k=20)
     U = mean(V.T.dot(A))
+    R = mean(A)
 
     # coords of the top left corner
     # screen resolution of the area to be recorded
     # width and height of the processed frame
-    x0, y0 = (40, 400)
+    x0, y0 = (40, 300)
     res = (820, 580)
     W, H = (380, 550)
 
@@ -113,15 +159,16 @@ if __name__ == '__main__':
     # will overlap the search window making the classification more accurate
     # in exchange for computing power
     stepx, stepy = (20, 20)
-    maxx, maxy = (17, 24)
-    threshold = 28.8
-    grouping = 0.56
+    maxx, maxy = (17, 26)
+    threshold = 11.15
+    grouping = 0.62
     factor = 1
     pr = 1
-    dim = (int(W * (pr+0.1)), int(H * pr))
+    dim = (int(W * (pr)), int(H * pr))
 
     print('Starting classification...')
     start = time.time(); l = 0; avgt = 0.0
+    detected = 0
 
     while True:
         locations = []
@@ -141,19 +188,25 @@ if __name__ == '__main__':
 
                 im = img_pad[dx[0]:dx[1], dy[0]:dy[1]]
 
-                L = mean(U * (im.reshape(w*h) - mean(A)))
+                L = mean(U * (im.reshape(w*h) - R))
                 dist = euclidian_dist(U, L)
                 d[k] = dist; k += 1
 
                 if dist < threshold:
-                    locations.append([dy[0]+5, dx[0]+5, int(w*0.75), int(h*0.7)])
-                    locations.append([dy[0]+5, dx[0]+5, int(w*0.75), int(h*0.7)])
+                    locations.append([dy[0]+5, dx[0]+5, int(w*0.7), int(h*0.78)])
+                    locations.append([dy[0]+5, dx[0]+5, int(w*0.7), int(h*0.78)])
 
             rects, _ = cv2.groupRectangles(locations, factor, grouping)
             for (x, y, w1, h1) in rects:
                 top_left = (x, y)
                 bottom_right = (x + h1, y + w1)
                 cv2.rectangle(img_pad, top_left, bottom_right, (255,255,255), 2)
+
+        # pos, center = sensor(rects)
+        #
+        # if pos:
+        #     cv2.circle(img_pad, center, 15, (255,255,255), thickness=3)
+        #     detected += 1
 
         avgt += (time.time() - start)
         out = cv2.resize(img_pad, dim, interpolation = cv2.INTER_AREA)
@@ -162,6 +215,7 @@ if __name__ == '__main__':
         if key == ord('q'):
             print(38*'-' + '\nFrame time = {:.2f}s; average FPS = {:.2f}'.format(avgt/l, l/(avgt)))
             print('Dist. = {:.2f}'.format(d.mean()))
+            print('{} notes detected'.format(detected))
             print('End program.\n'+ 38*'-')
             cv2.destroyAllWindows()
             break
