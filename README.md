@@ -1,12 +1,10 @@
-## Visual computing application using PCA
+## Computer Vision application using PCA
 
-Experimental bot that plays guitar flash (not yet). It uses Principal Component Analysis on screen-shots being taken at very low frame rate to detect the notes as it moves through the stage.
-That kind of analysis is not necessary, perhaps extremely redundant for this application, nevertheless it proves a point.
-
+Principal Component Analysis applied on low frame rate video to detect objects as it moves through a platform.
 
 ## Instructions
 
-The screenshot module does not work with systems other than those who uses X11 window manager. Support will (probably) be added in the future.
+The screenshot module does not work with systems other than those taht uses X11 window manager. Support will (probably) be added in the future.
 You can currently change manually to use pyscreenshot module that works in any system in exchange that is a lot slower.
 
 Replace the following line from 'guitarbot.py'
