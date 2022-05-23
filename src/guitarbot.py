@@ -146,21 +146,16 @@ if __name__ == '__main__':
     U = mean(V.T.dot(A))
     R = mean(A)
 
-    # coords of the top left corner
     # screen resolution of the area to be recorded
     # width and height of the processed frame
-    x0, y0 = (40, 300)
     res = (820, 580)
-    W, H = (380, 550)
+    W, H = (int(1.2*380), int(1.2*550))
 
     # position of the inner stage, where the notes are placed
     t1 = [330,230]
     t2 = [490,230]
     t3 = [205,530]
     t4 = [615,530]
-
-    pts1 = np.float32([t1, t2, t3, t4])
-    pts2 = np.float32([[0,0], [W,0], [0,H], [W,H]])
 
     # this is the frame search, if stepx, stepy < w, h the exceeding sizes
     # will overlap the search window making the classification more accurate
@@ -196,26 +191,26 @@ if __name__ == '__main__':
         img_pad = (grad * 255 / grad.max()).astype(np.uint8)
         img_screenshot = img_pad.copy()
 
-        for i in range(maxy):
-            for j in range(maxx):
-                dx = (stepx*i, w + (stepx*i))
-                dy = (stepy*j, h + (stepy*j))
+        #for i in range(maxy):
+            #for j in range(maxx):
+                #dx = (stepx*i, w + (stepx*i))
+                #dy = (stepy*j, h + (stepy*j))
 
-                im = img_pad[dx[0]:dx[1], dy[0]:dy[1]]
+                #im = img_pad[dx[0]:dx[1], dy[0]:dy[1]]
 
-                L = mean(U * (im.reshape(w*h) - R))
-                dist = euclidian_dist(U, L)
-                d[k] = dist; k += 1
+                #L = mean(U * (im.reshape(w*h) - R))
+                #dist = euclidian_dist(U, L)
+                #d[k] = dist; k += 1
 
-                if dist < threshold:
-                    locations.append([dy[0]+5, dx[0]+5, int(w*0.7), int(h*0.78)])
-                    locations.append([dy[0]+5, dx[0]+5, int(w*0.7), int(h*0.78)])
+                #if dist < threshold:
+                    #locations.append([dy[0]+5, dx[0]+5, int(w*0.7), int(h*0.78)])
+                    #locations.append([dy[0]+5, dx[0]+5, int(w*0.7), int(h*0.78)])
 
-            rects, _ = cv2.groupRectangles(locations, factor, grouping)
-            for (x, y, w1, h1) in rects:
-                top_left = (x, y)
-                bottom_right = (x + h1, y + w1)
-                cv2.rectangle(img_pad, top_left, bottom_right, (255,255,255), 2)
+            #rects, _ = cv2.groupRectangles(locations, factor, grouping)
+            #for (x, y, w1, h1) in rects:
+                #top_left = (x, y)
+                #bottom_right = (x + h1, y + w1)
+                #cv2.rectangle(img_pad, top_left, bottom_right, (255,255,255), 2)
 
         # pos, center = sensor(rects)
         #
@@ -232,14 +227,52 @@ if __name__ == '__main__':
             print('Dist. = {:.2f}'.format(d.mean()))
             print('{} notes detected'.format(detected))
             print('End program.\n'+ 38*'-')
+            print('t1 = ({}, {})'.format(t1[0], t1[1]))
+            print('t2 = ({}, {})'.format(t2[0], t2[1]))
+            print('t3 = ({}, {})'.format(t3[0], t3[1]))
+            print('t4 = ({}, {})'.format(t4[0], t4[1]))
             cv2.destroyAllWindows()
             break
-
         elif key == ord('s'):
             path = '../images/screenshots/screenshot_{}_stage.png'.format(int(time.time()))
-            output = np.array(img_screenshot * 256, dtype=np.uint8)
+            output = np.array(img_screenshot, dtype=np.uint8)
             cv2.imwrite(path, output)
             print('Screenshot taken saved at ' + path)
+        elif key == ord('h'):
+            t1[0] += 5
+            t1[1] -= 5
+        elif key == ord('l'):
+            t1[0] -= 5
+            t1[1] += 5
+        elif key == ord('j'):
+            t4[0] -= 5
+            t4[1] += 5
+        elif key == ord('k'):
+            t4[0] += 5
+            t4[1] -= 5
+        elif key == ord('p'):
+            t2[0] += 5
+            t2[1] -= 5
+        elif key == ord('n'):
+            t2[0] -= 5
+            t2[1] += 5
+        elif key == ord('4'):
+            t3[0] += 5
+            t3[1] -= 5
+        elif key == ord('6'):
+            t3[0] -= 5
+            t3[1] += 5
+        elif key == ord('8'):
+            x0 += 5
+            y0 -= 5
+        elif key == ord('2'):
+            x0 -= 5
+            y0 -= 5
+        elif key == ord('r'):
+            t1 = [330,230]
+            t2 = [490,230]
+            t3 = [205,530]
+            t4 = [615,530]
 
         title = 'Screen Capture (Guitar Flash 3) {}x{}'.format(dim[0], dim[1])
         cv2.imshow(title, out)
