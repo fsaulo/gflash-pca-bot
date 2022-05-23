@@ -130,9 +130,8 @@ if __name__ == '__main__':
         imgc = cv2.imread(note, cv2.IMREAD_GRAYSCALE) / 256
         imgc = cv2.resize(imgc, (h, w), interpolation = cv2.INTER_AREA)
         A[index:w*h] = imgc.reshape(w*h)
-        print(note + ' loaded!')
 
-    print('{} templates loaded & read for classification'.format(len(A)))
+    print('{} templates loaded & ready for classification'.format(len(A)))
     print(38*'-' + '\nCalculating a base for templates...')
 
     lamb, V = PCA(A.T, k=20)
