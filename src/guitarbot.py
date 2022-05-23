@@ -105,6 +105,14 @@ def sensor(notes):
 
     return pressed, (0,0)
 
+def sobel_edges(frame):
+    grad_x = cv2.Sobel(img_pad,cv2.CV_64F,1,0,ksize=5)
+    grad_y = cv2.Sobel(img_pad,cv2.CV_64F,0,1,ksize=5)
+
+    abs_grad_x = cv2.convertScaleAbs(grad_x)
+    abs_grad_y = cv2.convertScaleAbs(grad_y)
+
+    return np.sqrt(grad_x**2 + grad_y**2)
 
 if __name__ == '__main__':
 
@@ -170,6 +178,12 @@ if __name__ == '__main__':
     detected = 0
 
     while True:
+        # coords of the top left corner
+        x0 = 45
+        y0 = 225
+
+        pts1 = np.float32([t1, t2, t3, t4])
+        pts2 = np.float32([[0,0], [W,0], [0,H], [W,H]])
         locations = []
         d = np.zeros(maxx*maxy); k = 0
         start = time.time(); l += 1
@@ -178,6 +192,8 @@ if __name__ == '__main__':
         frame = np.array(img)
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) / 256
         img_pad = perspective_transform(frame, pts1, pts2, W, H)
+        grad = sobel_edges(img_pad)
+        img_pad = (grad * 255 / grad.max()).astype(np.uint8)
         img_screenshot = img_pad.copy()
 
         for i in range(maxy):
