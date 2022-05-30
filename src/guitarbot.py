@@ -152,10 +152,15 @@ if __name__ == '__main__':
     W, H = (int(1.2*380), int(1.2*550))
 
     # position of the inner stage, where the notes are placed
-    t1 = [330,230]
-    t2 = [490,230]
-    t3 = [205,530]
-    t4 = [615,530]
+    #t1 = [330,230]
+    #t2 = [490,230]
+    #t3 = [205,530]
+    #t4 = [615,530]
+
+    t1 = [320,230]
+    t2 = [445,230]
+    t3 = [175,520]
+    t4 = [590,520]
 
     # this is the frame search, if stepx, stepy < w, h the exceeding sizes
     # will overlap the search window making the classification more accurate
@@ -191,46 +196,50 @@ if __name__ == '__main__':
         img_pad = (grad * 255 / grad.max()).astype(np.uint8)
         img_screenshot = img_pad.copy()
 
-        #for i in range(maxy):
-            #for j in range(maxx):
-                #dx = (stepx*i, w + (stepx*i))
-                #dy = (stepy*j, h + (stepy*j))
+        minRadius = 15
+        maxRadius = 30
 
-                #im = img_pad[dx[0]:dx[1], dy[0]:dy[1]]
+        circles = cv2.HoughCircles(img_pad,cv2.HOUGH_GRADIENT,1,50,param1=50,param2=25,minRadius=minRadius,maxRadius=maxRadius)
 
-                #L = mean(U * (im.reshape(w*h) - R))
-                #dist = euclidian_dist(U, L)
-                #d[k] = dist; k += 1
+        img_copy = img_pad.copy()
 
-                #if dist < threshold:
-                    #locations.append([dy[0]+5, dx[0]+5, int(w*0.7), int(h*0.78)])
-                    #locations.append([dy[0]+5, dx[0]+5, int(w*0.7), int(h*0.78)])
+        cv2.circle(frame, (t1[0], t1[1]), 3, (255, 255, 255), -1)
+        cv2.circle(frame, (t2[0], t2[1]), 3, (255, 255, 255), -1)
+        cv2.circle(frame, (t3[0], t3[1]), 3, (255, 255, 255), -1)
+        cv2.circle(frame, (t4[0], t4[1]), 3, (255, 255, 255), -1)
+        cv2.line(frame, (t1[0], t2[1]), (t2[0], t1[1]), (255,255,255), 3)
+        cv2.line(frame, (t1[0], t1[1]), (t3[0], t3[1]), (255,255,255), 3)
+        cv2.line(frame, (t2[0], t2[1]), (t4[0], t4[1]), (255,255,255), 3)
+        cv2.line(frame, (t3[0], t4[1]), (t4[0], t3[1]), (255,255,255), 3)
 
-            #rects, _ = cv2.groupRectangles(locations, factor, grouping)
-            #for (x, y, w1, h1) in rects:
-                #top_left = (x, y)
-                #bottom_right = (x + h1, y + w1)
-                #cv2.rectangle(img_pad, top_left, bottom_right, (255,255,255), 2)
+        if circles is not None:
+            circles = np.round(circles[0, :]).astype("int")
 
-        # pos, center = sensor(rects)
-        #
-        # if pos:
-        #     cv2.circle(img_pad, center, 15, (255,255,255), thickness=3)
-        #     detected += 1
+            for (x, y, r) in circles:
+                #print(" x = {}, y = {}, r = {} ".format(x, y, r))
+                if y < 580:
+                    center = (x, y)
+                    if y > 430 and y < 435:
+                        print("[({}, {}), r = {}]: Objected detected".format(x, y, r))
+                        detected += 1
+                    cv2.circle(img_copy, center, 1, (255, 255, 255), 3)
+                    cv2.circle(img_copy, (x, y), r, (255,255,255), 3)
+
+        cv2.imshow('Screen Capture (Origina)',frame)
 
         avgt += (time.time() - start)
-        out = cv2.resize(img_pad, dim, interpolation = cv2.INTER_AREA)
+        out = cv2.resize(img_copy, dim, interpolation = cv2.INTER_AREA)
         key = cv2.waitKey(1)
 
         if key == ord('q'):
-            print(38*'-' + '\nFrame time = {:.2f}s; average FPS = {:.2f}'.format(avgt/l, l/(avgt)))
-            print('Dist. = {:.2f}'.format(d.mean()))
-            print('{} notes detected'.format(detected))
-            print('End program.\n'+ 38*'-')
+            print(38*'-')
+            print('Frame time = {:.2f}s; average FPS = {:.2f}'.format(avgt/l, l/(avgt)))
+            print('{} objects detected'.format(detected))
             print('t1 = ({}, {})'.format(t1[0], t1[1]))
             print('t2 = ({}, {})'.format(t2[0], t2[1]))
             print('t3 = ({}, {})'.format(t3[0], t3[1]))
             print('t4 = ({}, {})'.format(t4[0], t4[1]))
+            print(38*'-')
             cv2.destroyAllWindows()
             break
         elif key == ord('s'):
